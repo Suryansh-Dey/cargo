@@ -4,7 +4,8 @@ members = [
   "crates/*",
   "credential/*",
   "benches/benchsuite",
-  "benches/capture",
+  "benches/capture", 
+  "test_crate",
 ]
 exclude = [
   "target/", # exclude bench testing

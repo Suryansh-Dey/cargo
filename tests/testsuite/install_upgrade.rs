@@ -886,6 +886,45 @@ fn deletes_orphaned() {
 }
 
 #[cargo_test]
+fn keeps_orphaned_when_specific_bin_targeted() {
+    let p = project()
+        .file(
+            "Cargo.toml",
+            r#"
+            [package]
+            name = "foo"
+            version = "0.1.0"
+            "#,
+        )
+        .file("src/bin/bin_a.rs", "fn main() {}")
+        .file("src/bin/bin_b.rs", "fn main() {}")
+        .build();
+    p.cargo("install --path . --bin bin_a").run();
+    assert!(installed_exe("bin_a").exists());
+
+    // Remove bin_a from the project entirely.
+    fs::remove_file(p.root().join("src/bin/bin_a.rs")).unwrap();
+
+    // Now install bin_b specifically.
+    p.cargo("install --path . --bin bin_b")
+        .with_stderr_data(str![[r#"
+[INSTALLING] foo v0.1.0 ([ROOT]/foo)
+[WARNING] Cargo.toml: `package.edition` is unspecified, defaulting to `2015` while the latest is `2024`
+[WARNING] `foo` (manifest) generated 1 warning
+[COMPILING] foo v0.1.0 ([ROOT]/foo)
+[FINISHED] `release` profile [optimized] target(s) in [ELAPSED]s
+[INSTALLING] [ROOT]/home/.cargo/bin/bin_b[EXE]
+[INSTALLED] package `foo v0.1.0 ([ROOT]/foo)` (executable `bin_b[EXE]`)
+[WARNING] be sure to add `[ROOT]/home/.cargo/bin` to your PATH to be able to run the installed binaries
+"#]])
+        .run();
+
+    // bin_a should still exist because we targeted a specific bin.
+    assert!(installed_exe("bin_a").exists());
+    assert!(installed_exe("bin_b").exists());
+}
+
+#[cargo_test]
 fn already_installed_exact_does_not_update() {
     pkg("foo", "1.0.0");
     cargo_process("install foo  --version=1.0.0").run();

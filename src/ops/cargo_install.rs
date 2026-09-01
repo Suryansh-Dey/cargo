@@ -553,18 +553,35 @@ impl<'gctx> InstallablePackage<'gctx> {
                 &self.rustc.verbose_version,
             );
 
-            if let Err(e) = remove_orphaned_bins(
-                &self.ws,
-                &mut tracker,
-                &duplicates,
-                &self.pkg,
-                &dst,
-                dry_run,
-            ) {
-                // Don't hard error on remove.
-                self.gctx
-                    .shell()
-                    .warn(format!("failed to remove orphan: {:?}", e))?;
+            let is_specific_target = match &self.opts.filter {
+                CompileFilter::Default { .. } => false,
+                CompileFilter::Only {
+                    bins,
+                    examples,
+                    tests,
+                    benches,
+                    ..
+                } => {
+                    let has_just =
+                        |rule: &FilterRule| matches!(rule, FilterRule::Just(v) if !v.is_empty());
+                    has_just(bins) || has_just(examples) || has_just(tests) || has_just(benches)
+                }
+            };
+
+            if !is_specific_target {
+                if let Err(e) = remove_orphaned_bins(
+                    &self.ws,
+                    &mut tracker,
+                    &duplicates,
+                    &self.pkg,
+                    &dst,
+                    dry_run,
+                ) {
+                    // Don't hard error on remove.
+                    self.gctx
+                        .shell()
+                        .warn(format!("failed to remove orphan: {:?}", e))?;
+                }
             }
 
             match tracker.save() {
